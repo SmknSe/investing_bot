@@ -10,9 +10,9 @@ bot = telebot.TeleBot("5279674502:AAFXF-kDxk_WVVo9Br5YN5PmNQohsR3oxFQ")
 def menu1():
     m = InlineKeyboardMarkup()
     m.row_width = 1
-    m.add(InlineKeyboardButton("Цены", callback_data='getprice'),
-          InlineKeyboardButton("Добавить в портфель", callback_data='addtocase'),
-          InlineKeyboardButton("Получить портфель", callback_data='getcase'),
+    m.add(InlineKeyboardButton("📈 Цены", callback_data='getprice'),
+          InlineKeyboardButton("💼⟵ Добавить в портфель", callback_data='addtocase'),
+          InlineKeyboardButton("💼⟶ Получить портфель", callback_data='getcase'),
           )
     return m
 
@@ -20,7 +20,7 @@ def menu1():
 def menu2():
     m = InlineKeyboardMarkup()
     m.row_width = 1
-    m.add(InlineKeyboardButton("В меню", callback_data="tomenu"))
+    m.add(InlineKeyboardButton("‹ В меню", callback_data="tomenu"))
     return m
 
 
@@ -53,8 +53,11 @@ def callback_inline(call):
     try:
         if call.message:
             if call.data == "getprice":
-                bot.edit_message_text("Введите тикер для получения информации", call.message.chat.id,
-                                      call.message.message_id)
+                bot.edit_message_text(
+                    '"Цены" - получение цены котировки\n"Добавить в портфель" - добавление котировки в портфель'
+                    '\n"Получить портфель" - вывод портфеля и информации о прибыли',
+                    call.message.chat.id, call.message.message_id,)
+                bot.send_message(call.message.chat.id,'Введите тикер для получения информации')
                 bot.answer_callback_query(call.id)
                 bot.register_next_step_handler(call.message, send_ticker)
             elif call.data == "addtocase":
@@ -112,6 +115,7 @@ def get_stock_case(message):
     f = open('text.txt', 'r')
     summC = 0
     summS = 0
+    msg = ''
     while (True):
         s = f.readline().split(' ')
         print(s)
@@ -123,17 +127,16 @@ def get_stock_case(message):
             summS += float(t[1]) * float(s[2])
             delta = (float(s[1]) - float(t[1])) * float(s[2])
             if (delta > 0):
-                bot.send_message(message.chat.id,
-                                 id + ': Вы заработали ' + str(abs(delta)) + 'USD (' + '{:8.3f}'.format(
-                                     100 * float(s[1]) / float(t[1]) - 100) + ' %)')
+                msg += id + ': Вы заработали ' + '{:8.3f}'.format(abs(delta)) + 'USD (' + '{:8.3f}'.format(
+                    100 * float(s[1]) / float(t[1]) - 100) + ' %)'+'\n'
             else:
-                bot.send_message(message.chat.id,
-                                 id + ': Вы потеряли ' + str(abs(delta)) + 'USD (' + '{:8.3f}'.format(
-                                     100 * float(s[1]) / float(t[1]) - 100) + ' %)')
+                msg += id + ': Вы потеряли ' + '{:8.3f}'.format(abs(delta)) + 'USD (' + '{:8.3f}'.format(
+                                     100 * float(s[1]) / float(t[1]) - 100) + ' %)'+'\n'
         else:
             break
+    bot.send_message(message.chat.id, msg)
     bot.send_message(message.chat.id,
-                     'Итоговая разница в стоимости: ' + str(summC - summS) + 'USD (' + '{:8.3f}'.format(
+                     'Итоговая разница в стоимости: ' + '{:8.3f}'.format(summC - summS) + 'USD (' + '{:8.3f}'.format(
                          100 * summC / summS - 100) + ' %)')
 
 
@@ -148,8 +151,13 @@ def send_ticker(message):
         data = r.json()
         print(data)
         res = 'Последнее обновление о тикере ' + id + ' от ' + data['Meta Data']['3. Last Refreshed'] + ' :\n'
-        for r1 in (data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]):
-            res = res + r1 + ' ' + data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']][r1] + '\n'
+        res += 'хуйня1 '+ data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]['1. open']+'\n'
+        res += 'хуйня2 '+ data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]['2. high'] + '\n'
+        res += 'хуйня3 '+ data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]['3. low'] + '\n'
+        res += 'хуйня4 '+ data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]['4. close'] + '\n'
+        res += 'хуйня5 '+ data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]['5. volume'] + '\n'
+        # for r1 in (data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]):
+        #     res = res + r1 + ' ' + data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']][r1] + '\n'
         bot.send_message(message.chat.id, res, reply_markup=menu2())
     except:
         bot.send_message(message.chat.id, 'Введен некорректный тикер', reply_markup=menu2())
