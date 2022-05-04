@@ -1,9 +1,79 @@
 import telebot
 import json
 import requests
-from telebot import types
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 import os
+
 bot = telebot.TeleBot("5279674502:AAFXF-kDxk_WVVo9Br5YN5PmNQohsR3oxFQ")
+
+
+def menu1():
+    m = InlineKeyboardMarkup()
+    m.row_width = 1
+    m.add(InlineKeyboardButton("Цены", callback_data='getprice'),
+          InlineKeyboardButton("Добавить в портфель", callback_data='addtocase'),
+          InlineKeyboardButton("Получить портфель", callback_data='getcase'),
+          )
+    return m
+
+
+def menu2():
+    m = InlineKeyboardMarkup()
+    m.row_width = 1
+    m.add(InlineKeyboardButton("В меню", callback_data="tomenu"))
+    return m
+
+
+# def startkb():  # Добавление клавиатуры
+#    keyboard = ReplyKeyboardMarkup(row_width=1, resize_keyboard=True, one_time_keyboard=True)
+#    Start = KeyboardButton("В меню")
+#    keyboard.add(Start)
+#    return keyboard
+
+
+# @bot.message_handler(content_types=['text'])
+# def start_msg(message): #Начало работы
+#   bot.send_message(message.chat.id,"Добро пожаловать, для продолжения отправьте сообщение любого содержания",reply_markup=startkb())
+#  bot.register_next_step_handler(message, mainmenu)
+
+@bot.message_handler(func=lambda message: message.text == "/start")
+def mainmenu(message):
+    bot.send_message(message.chat.id,
+                     '"Цены" - получение цены котировки\n"Добавить в портфель" - добавление котировки в портфель'
+                     '\n"Получить портфель" - вывод портфеля и информации о прибыли', reply_markup=menu1())
+
+
+@bot.message_handler(func=lambda message: message.text != "/start")
+def errormsg(message):
+    bot.send_message(message.chat.id, "Перемещайтесь по меню с помощью встроенных кнопок")
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+    try:
+        if call.message:
+            if call.data == "getprice":
+                bot.edit_message_text("Введите тикер для получения информации", call.message.chat.id,
+                                      call.message.message_id)
+                bot.answer_callback_query(call.id)
+                bot.register_next_step_handler(call.message, send_ticker)
+            elif call.data == "addtocase":
+                bot.edit_message_text("Введите тикер для добавления в портфель", call.message.chat.id,
+                                      call.message.message_id)
+                bot.answer_callback_query(call.id)
+                bot.register_next_step_handler(call.message, add_stock_case)
+            elif call.data == "getcase":
+                bot.send_message(call.message.chat.id, "Подсчитываю...")
+                get_stock_case(call.message)
+            elif call.data == "tomenu":
+                bot.edit_message_text(
+                    '"Цены" - получение цены котировки\n"Добавить в портфель" - добавление котировки в портфель'
+                    '\n"Получить портфель" - вывод портфеля и информации о прибыли',
+                    call.message.chat.id, call.message.message_id, reply_markup=menu1())
+                bot.answer_callback_query(call.id)
+    except Exception as e:
+        print(repr(e))
+
 
 def get_current_price(id):
     url = 'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=' + id + '&interval=1min&apikey=GA64HKYKKJO0LUUU'
@@ -17,88 +87,82 @@ def get_current_price(id):
     except:
         return (-1)
 
-def catalog_keyboard():
-    keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
-    Help = types.KeyboardButton(text="/help")
-    Price = types.KeyboardButton(text="/get_price")
-    Add_stock = types.KeyboardButton(text="/add_to_case")
-    Get_stock = types.KeyboardButton(text="/get_case")
-    keyboard.add(Help, Price, Add_stock, Get_stock)
-    return keyboard
-
-@bot.message_handler(content_types=['text'])
-def start(message):
-    if message.text == '/help':
-        bot.send_message(message.chat.id, 'Для получения цены котировки введите /get_price\nДля добавления котировки в портфель введите /add_to_case\nДля получения цены портфеля введите /get_case', reply_markup=catalog_keyboard())
-        #bot.send_message(message.from_user.id, 'Для получения цены котировки введите /get_price\nДля добавления котировки в портфель введите /add_to_case\nДля получения цены портфеля введите /get_case')
-    elif message.text == '/get_price':
-        bot.send_message(message.from_user.id, "input ticker")
-        bot.register_next_step_handler(message, send_ticker)  # следующий шаг – функция get_name
-    elif message.text == '/add_to_case':
-        bot.send_message(message.from_user.id, "input ticker")
-        bot.register_next_step_handler(message, add_stock_case)
-    elif message.text == '/get_case':
-        bot.send_message(message.from_user.id, "calculating")
-        get_stock_case(message)
-    else:
-        bot.send_message(message.from_user.id, 'Не смог разобрать команду.\nНапиши /help')
 
 def add_stock_case(message):
+    if (message.text == '/start'):
+        mainmenu(message)
+        return
     f = open('text.txt', 'a')
     id = message.text
     url = 'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=' + id + '&interval=1min&apikey=GA64HKYKKJO0LUUU'
     try:
         t = get_current_price(id)
-        res = t[0]+' '+t[1]
-        if (not os.stat("text.txt").st_size == 0): res = '\n'+res
+        res = t[0] + ' ' + t[1]
+        if (not os.stat("text.txt").st_size == 0): res = '\n' + res
         print(res)
 
-        bot.send_message(message.from_user.id, "input amount of stocks")
+        bot.send_message(message.chat.id, "Введите количество")
         bot.register_next_step_handler(message, add_num_of_stocks, res)
     except:
-        bot.send_message(message.from_user.id, 'incorrect ticker. Try again')
+        bot.send_message(message.chat.id, 'Некорректный тикер. Попробуйте снова')
         bot.register_next_step_handler(message, add_stock_case)
+
 
 def get_stock_case(message):
     f = open('text.txt', 'r')
-    summC=0
-    summS=0
+    summC = 0
+    summS = 0
     while (True):
         s = f.readline().split(' ')
         print(s)
         if (s == ''): break
         id = s[0]
         t = get_current_price(id)
-        if (t!=-1):
-            summC+=float(s[1])*float(s[2])
-            summS+=float(t[1])*float(s[2])
+        if (t != -1):
+            summC += float(s[1]) * float(s[2])
+            summS += float(t[1]) * float(s[2])
             delta = (float(s[1]) - float(t[1])) * float(s[2])
-            if (delta>0): bot.send_message(message.from_user.id, id +': u have rised up ' + str(abs(delta)) +'USD ('+'{:8.3f}'.format(100*float(s[1]) / float(t[1])-100)+' %)')
-            else: bot.send_message(message.from_user.id, id +': u have lost ' + str(abs(delta)) +'USD ('+'{:8.3f}'.format(100*float(s[1]) / float(t[1])-100)+' %)')
-        else: break
-    bot.send_message(message.from_user.id, 'Итоговая разница в стоимости: '+ str(summC-summS) + 'USD ('+'{:8.3f}'.format(100*summC / summS-100)+' %)')
+            if (delta > 0):
+                bot.send_message(message.chat.id,
+                                 id + ': Вы заработали ' + str(abs(delta)) + 'USD (' + '{:8.3f}'.format(
+                                     100 * float(s[1]) / float(t[1]) - 100) + ' %)')
+            else:
+                bot.send_message(message.chat.id,
+                                 id + ': Вы потеряли ' + str(abs(delta)) + 'USD (' + '{:8.3f}'.format(
+                                     100 * float(s[1]) / float(t[1]) - 100) + ' %)')
+        else:
+            break
+    bot.send_message(message.chat.id,
+                     'Итоговая разница в стоимости: ' + str(summC - summS) + 'USD (' + '{:8.3f}'.format(
+                         100 * summC / summS - 100) + ' %)')
+
 
 def send_ticker(message):
+    if (message.text == '/start'):
+        mainmenu(message)
+        return
     id = message.text
     url = 'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=' + id + '&interval=1min&apikey=GA64HKYKKJO0LUUU'
     try:
         r = requests.get(url)
         data = r.json()
         print(data)
-        res = 'Last refreshed information about ' + id + ' ticker at ' + data['Meta Data']['3. Last Refreshed'] + ':\n'
+        res = 'Последнее обновление о тикере ' + id + ' от ' + data['Meta Data']['3. Last Refreshed'] + ' :\n'
         for r1 in (data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']]):
             res = res + r1 + ' ' + data['Time Series (1min)'][data['Meta Data']['3. Last Refreshed']][r1] + '\n'
-        bot.send_message(message.from_user.id, res)
+        bot.send_message(message.chat.id, res, reply_markup=menu2())
     except:
-        bot.send_message(message.from_user.id, 'incorrect ticker. Try again')
-        bot.register_next_step_handler(message, send_ticker)
+        bot.send_message(message.chat.id, 'Введен некорректный тикер', reply_markup=menu2())
 
-def add_num_of_stocks(message,res):
+
+def add_num_of_stocks(message, res):
     f = open('text.txt', 'a')
     if ((message.text).isdigit()):
-            r = res+' '+message.text
-            f.write(r)
-            bot.send_message(message.from_user.id, 'good')
+        r = res + ' ' + message.text
+        f.write(r)
+        bot.send_message(message.chat.id, 'заебись заКИнул')
     else:
-        bot.send_message(message.from_user.id,'incorrect num. Try again')
+        bot.send_message(message.chat.id, 'Некорректный ввод. Попробуйте снова')
+
+
 bot.polling(none_stop=True, interval=0)
